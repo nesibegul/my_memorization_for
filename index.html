@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Hafızlık Pro AI</title>
+<link href="https://fonts.googleapis.com/css2?family=Amiri+Quran&family=Amiri:wght@400;700&display=swap" rel="stylesheet">
+<style>
+    :root { 
+        --gold: #c9a84c; --bg: #091a10; --paper: #f4e6d3; 
+        --green: #1a4a2e; --text: #2c2c2c; --red: #d9534f;
+    }
+    
+    html, body { height: 100dvh; margin: 0; padding: 0; overflow: hidden; background: var(--bg); font-family: 'Amiri', serif; }
+    #app { width: 100%; max-width: 450px; height: 100dvh; margin: 0 auto; background: var(--paper); display: flex; flex-direction: column; position: relative; }
+
+    /* Üst Panel */
+    .hdr { 
+        background: linear-gradient(180deg, #0d2416, #091a10); 
+        color: var(--gold); padding: 10px 15px; 
+        display: flex; justify-content: space-between; align-items: center; 
+        z-index: 100; border-bottom: 2px solid var(--gold);
+        box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+    }
+
+    /* Sayfa Alanı */
+    #viewer { 
+        flex: 1; overflow-y: auto; background: var(--paper); 
+        padding: 20px 25px; text-align: center;
+        display: flex; flex-direction: column;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .quran-text { 
+        font-family: 'Amiri Quran', serif; font-size: 26px; line-height: 2.3;
+        color: var(--text); direction: rtl; text-align: justify;
+    }
+
+    .ayah-text { cursor: pointer; border-radius: 5px; padding: 2px 4px; display: inline; transition: background 0.3s; }
+    .highlight { background: rgba(201, 168, 76, 0.3); border-radius: 8px; }
+
+    .verse-num {
+        font-family: sans-serif; font-size: 14px; color: var(--gold);
+        border: 1px solid var(--gold); border-radius: 50%;
+        width: 28px; height: 28px; display: inline-flex;
+        align-items: center; justify-content: center; margin: 0 8px;
+        vertical-align: middle; font-weight: bold;
+    }
+
+    /* AI Analiz Paneli */
+    #ai-panel {
+        position: fixed; top: 15%; left: 5%; right: 5%;
+        background: white; border-radius: 20px; padding: 20px;
+        box-shadow: 0 15px 50px rgba(0,0,0,0.7);
+        z-index: 500; display: none; flex-direction: column; gap: 15px;
+        border: 2px solid var(--gold);
+    }
+    .ai-res-text { direction: rtl; font-family: 'Amiri Quran'; font-size: 22px; line-height: 1.8; text-align: right; }
+    .word-correct { color: #27ae60; }
+    .word-wrong { color: var(--red); text-decoration: underline; font-weight: bold; }
+
+    /* Alt Kontroller */
+    .controls { background: #fff; border-top: 3px solid var(--gold); padding: 10px 10px 30px 10px; z-index: 110; flex-shrink: 0; }
+    .settings-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; background: #f1f3f1; padding: 6px 12px; border-radius: 10px; }
+    
+    .btn-row { display: flex; justify-content: space-around; align-items: center; }
+    .main-btn { width: 60px; height: 60px; background: var(--gold); border-radius: 50%; display: flex; justify-content: center; align-items: center; color: white; font-size: 28px; border:none; cursor: pointer; }
+    
+    .mic-btn {
+        width: 50px; height: 50px; background: var(--red); border-radius: 50%;
+        display: flex; justify-content: center; align-items: center; color: white;
+        box-shadow: 0 4px 10px rgba(0,0,0,0.2); border: none; cursor: pointer;
+    }
+    .mic-btn.active { animation: pulse 1.2s infinite; background: #27ae60; }
+    @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.1); } 100% { transform: scale(1); } }
+
+    /* Modallar */
+    .modal { position: fixed; inset: 0; background: rgba(0,0,0,0.85); display: none; z-index: 400; justify-content: center; align-items: center; }
+    .modal-content { background: white; width: 95%; max-height: 85%; border-radius: 20px; overflow: hidden; display: flex; flex-direction: column; }
+    
+    .modal-tabs { display: flex; background: #d0d0d0; }
+    .tab-btn { flex: 1; padding: 15px; border: none; background: #c0c0c0; font-weight: bold; cursor: pointer; color: #555; }
+    .tab-btn.active { background: #ffffff !important; color: var(--green) !important; border-top: 4px solid var(--green); }
+    .tab-content { flex: 1; overflow-y: auto; padding: 15px; }
+
+    #status-bar { position: fixed; top: 60px; width: 100%; max-width: 450px; background: var(--green); color: #fff; text-align: center; font-size: 12px; padding: 5px 0; display: none; z-index: 90; }
+</style>
+</head>
+<body>
+
+<div id="app">
+    <div class="hdr">
+        <button onclick="openFihrist()" style="background:none; border:none; color:var(--gold); font-size:28px; cursor:pointer">☰</button>
+        <div style="text-align:center">
+            <b id="page-info">SAYFA 1</b><br>
+            <small id="cuz-info" style="color:var(--gold); font-weight:bold">1. CÜZ</small>
+        </div>
+        <button onclick="toggleEzber()" id="ezber-btn" style="background:none; border:none; color:var(--gold); font-size:28px; cursor:pointer">☆</button>
+    </div>
+
+    <div id="status-bar">Ayet Okunuyor...</div>
+
+    <div id="ai-panel">
+        <div style="display:flex; justify-content:space-between; align-items:center">
+            <b style="color:var(--green)">AI Hata Kontrolü</b>
+            <button onclick="closeAI()" style="background:none; border:none; font-size:24px; cursor:pointer">✕</button>
+        </div>
+        <div id="ai-result" class="ai-res-text"></div>
+        <div style="font-size:12px; color:#666; text-align:center; padding-top:10px; border-top:1px solid #eee">
+            Yeşil: Doğru | Kırmızı: Atlanan/Yanlış
+        </div>
+    </div>
+
+    <div id="viewer">
+        <div id="page-content" class="quran-text"></div>
+    </div>
+
+    <div class="controls">
+        <div class="settings-bar">
+            <select id="reciter" onchange="state.reciter = this.value; saveSettings();">
+                <option value="Alafasy_128kbps">Mishary Alafasy</option>
+                <option value="Husary_128kbps">Mahmoud Husari</option>
+                <option value="Minshawy_Murattal_128kbps">Minshawy</option>
+            </select>
+            <div id="ayah-counter" style="color:var(--green); font-weight:bold; font-size:12px">AYET: 0/0</div>
+        </div>
+
+        <div class="btn-row">
+            <button class="nav-btn" style="background:none; border:none; cursor:pointer" onclick="changePage(-1)"><div>⏮</div><span style="font-size:10px; color:var(--green)">GERİ</span></button>
+            <button class="main-btn" onclick="togglePlay()" id="play-btn">▶</button>
+            <button class="nav-btn" style="background:none; border:none; cursor:pointer" onclick="changePage(1)"><div>⏭</div><span style="font-size:10px; color:var(--green)">İLERİ</span></button>
+            <button class="mic-btn" onclick="startAIAnalysis()" id="mic-btn">🎙</button>
+        </div>
+    </div>
+</div>
+
+<div id="modal" class="modal" onclick="closeModal()">
+    <div class="modal-content" onclick="event.stopPropagation()">
+        <div class="modal-tabs">
+            <button class="tab-btn active" onclick="switchTab(this, 'sure')">SURE</button>
+            <button class="tab-btn" onclick="switchTab(this, 'cuz')">CÜZ</button>
+            <button class="tab-btn" onclick="switchTab(this, 'sayfa')">SAYFA</button>
+        </div>
+        <div class="tab-content" id="modal-body"></div>
+    </div>
+</div>
+
+<audio id="audio"></audio>
+
+<script>
+const state = {
+    page: parseInt(localStorage.getItem('hafiz_last_page')) || 1,
+    reciter: localStorage.getItem('hafiz_reciter') || 'Alafasy_128kbps',
+    ezber: new Set(JSON.parse(localStorage.getItem('hafiz_ezber_list') || '[]')),
+    playing: false,
+    isListening: false,
+    currentAyahIndex: 0,
+    pageVerses: [],
+    surahs: []
+};
+
+const audio = document.getElementById('audio');
+const pageContent = document.getElementById('page-content');
+const statusBar = document.getElementById('status-bar');
+
+async function init() {
+    document.getElementById('reciter').value = state.reciter;
+    try {
+        const res = await fetch('https://api.quran.com/api/v4/chapters?language=tr');
+        const data = await res.json();
+        state.surahs = data.chapters;
+    } catch (e) {}
+    loadPage();
+}
+
+async function loadPage() {
+    stopAudio();
+    pageContent.innerHTML = "<div style='text-align:center; padding:100px; font-size:18px'>Yükleniyor...</div>";
+    localStorage.setItem('hafiz_last_page', state.page);
+    document.getElementById('page-info').textContent = `SAYFA ${state.page}`;
+    document.getElementById('cuz-info').textContent = `${Math.ceil(state.page/20)}. CÜZ`;
+    document.getElementById('ezber-btn').textContent = state.ezber.has(state.page) ? '★' : '☆';
+    
+    try {
+        const response = await fetch(`https://api.quran.com/api/v4/verses/by_page/${state.page}?language=tr&fields=text_uthmani`);
+        const data = await response.json();
+        state.pageVerses = data.verses;
+        renderPage();
+        document.getElementById('ayah-counter').textContent = `AYET: 0/${state.pageVerses.length}`;
+    } catch (e) { pageContent.innerHTML = "İnterneti kontrol edin."; }
+}
+
+function renderPage() {
+    let html = "";
+    state.pageVerses.forEach((v, index) => {
+        html += `<span id="v-${index}" class="ayah-text" onclick="state.currentAyahIndex=${index}; playAyah();">${v.text_uthmani} <span class="verse-num">${v.verse_number}</span> </span>`;
+    });
+    pageContent.innerHTML = html;
+}
+
+function startAIAnalysis() {
+    const SpeechAPI = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechAPI) { alert("Lütfen Chrome kullanın."); return; }
+    if (state.isListening) { recognition.stop(); return; }
+
+    recognition = new SpeechAPI();
+    recognition.lang = 'ar-SA';
+    recognition.onstart = () => {
+        state.isListening = true;
+        document.getElementById('mic-btn').classList.add('active');
+        showToast("Dinliyorum... Lütfen okuyun.");
+    };
+    recognition.onresult = (event) => {
+        compareTexts(event.results[0][0].transcript, state.pageVerses[state.currentAyahIndex].text_uthmani);
+    };
+    recognition.onerror = () => {
+        state.isListening = false;
+        document.getElementById('mic-btn').classList.remove('active');
+    };
+    recognition.onend = () => {
+        state.isListening = false;
+        document.getElementById('mic-btn').classList.remove('active');
+    };
+    recognition.start();
+}
+
+function compareTexts(spoken, original) {
+    const clean = (t) => t.replace(/[\u064B-\u065F\u0610-\u061A\u06D6-\u06DC]/g, "").trim();
+    const spokenWords = clean(spoken).split(/\s+/);
+    const originalWords = original.split(/\s+/);
+    let resultHTML = "";
+    originalWords.forEach((word) => {
+        const wordClean = clean(word);
+        const match = spokenWords.some(sw => sw.includes(wordClean) || wordClean.includes(sw));
+        resultHTML += `<span class="${match ? 'word-correct' : 'word-wrong'}">${word}</span> `;
+    });
+    document.getElementById('ai-panel').style.display = 'flex';
+    document.getElementById('ai-result').innerHTML = resultHTML;
+}
+
+function closeAI() { document.getElementById('ai-panel').style.display = 'none'; }
+
+function togglePlay() {
+    state.playing ? (audio.pause(), state.playing = false, document.getElementById('play-btn').textContent = '▶', statusBar.style.display = 'none') : playAyah();
+}
+
+function playAyah() {
+    if (state.currentAyahIndex >= state.pageVerses.length) { stopAudio(); showToast("Sayfa Bitti."); return; }
+    const v = state.pageVerses[state.currentAyahIndex];
+    const sId = String(v.verse_key.split(':')[0]).padStart(3, '0');
+    const aId = String(v.verse_key.split(':')[1]).padStart(3, '0');
+    document.querySelectorAll('.ayah-text').forEach(el => el.classList.remove('highlight'));
+    const el = document.getElementById(`v-${state.currentAyahIndex}`);
+    if(el) { el.classList.add('highlight'); el.scrollIntoView({behavior:'smooth', block:'center'}); }
+    audio.src = `https://everyayah.com/data/${state.reciter}/${sId}${aId}.mp3`;
+    audio.play();
+    state.playing = true;
+    document.getElementById('play-btn').textContent = '⏸';
+    statusBar.style.display = 'block';
+    statusBar.textContent = `${v.verse_number}. Ayet okunuyor...`;
+    document.getElementById('ayah-counter').textContent = `AYET: ${state.currentAyahIndex + 1}/${state.pageVerses.length}`;
+    if ('mediaSession' in navigator) {
+        navigator.mediaSession.metadata = new MediaMetadata({ title: `Sayfa ${state.page}`, artist: 'Hafızlık Pro AI' });
+    }
+}
+audio.onended = () => { state.currentAyahIndex++; playAyah(); };
+
+function stopAudio() {
+    audio.pause(); state.playing = false; state.currentAyahIndex = 0;
+    document.getElementById('play-btn').textContent = '▶';
+    statusBar.style.display = 'none';
+    document.querySelectorAll('.ayah-text').forEach(el => el.classList.remove('highlight'));
+}
+
+function changePage(n) {
+    state.page = Math.max(1, Math.min(604, state.page + n));
+    loadPage();
+}
+
+function saveSettings() { localStorage.setItem('hafiz_reciter', state.reciter); }
+
+function toggleEzber() {
+    state.ezber.has(state.page) ? state.ezber.delete(state.page) : state.ezber.add(state.page);
+    localStorage.setItem('hafiz_ezber_list', JSON.stringify([...state.ezber]));
+    document.getElementById('ezber-btn').textContent = state.ezber.has(state.page) ? '★' : '☆';
+}
+
+function openFihrist() { document.getElementById('modal').style.display = 'flex'; switchTab(document.querySelector('.tab-btn'), 'sure'); }
+function closeModal() { document.getElementById('modal').style.display = 'none'; }
+
+function switchTab(btn, type) {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    const body = document.getElementById('modal-body');
+    body.innerHTML = "";
+    if (type === 'sure') {
+        state.surahs.forEach(s => {
+            const d = document.createElement('div');
+            d.style = "padding:15px; border-bottom:1px solid #eee; display:flex; justify-content:space-between; cursor:pointer";
+            d.innerHTML = `<span>${s.id}. ${s.name_simple}</span> <b>${s.name_arabic}</b>`;
+            d.onclick = () => { state.page = s.pages[0]; loadPage(); closeModal(); };
+            body.appendChild(d);
+        });
+    } else if (type === 'sayfa') {
+        const grid = document.createElement('div');
+        grid.style = "display:grid; grid-template-columns:repeat(5,1fr); gap:10px";
+        for (let i = 1; i <= 604; i++) {
+            const isEzber = state.ezber.has(i);
+            const b = document.createElement('div');
+            b.style = `padding:12px; text-align:center; background:${isEzber ? 'var(--gold)' : '#f1f1f1'}; color:${isEzber ? 'white' : '#333'}; border-radius:8px; font-weight:bold; cursor:pointer`;
+            b.textContent = i;
+            b.onclick = () => { state.page = i; loadPage(); closeModal(); };
+            grid.appendChild(b);
+        }
+        body.appendChild(grid);
+    } else if (type === 'cuz') {
+        const pages = [1, 22, 42, 62, 82, 102, 122, 142, 162, 182, 202, 222, 242, 262, 282, 302, 322, 342, 362, 382, 402, 422, 442, 462, 482, 502, 522, 542, 562, 582];
+        for (let i = 1; i <= 30; i++) {
+            const d = document.createElement('div');
+            d.style = "padding:15px; border-bottom:1px solid #eee; cursor:pointer; font-weight:bold";
+            d.textContent = `${i}. Cüz Başlangıcı`;
+            d.onclick = () => { state.page = pages[i-1]; loadPage(); closeModal(); };
+            body.appendChild(d);
+        }
+    }
+}
+
+function showToast(m) {
+    const t = document.createElement('div');
+    t.style = "position:fixed; bottom:100px; left:50%; transform:translateX(-50%); background:rgba(0,0,0,0.85); color:white; padding:12px 24px; border-radius:30px; font-size:14px; z-index:3000; font-weight:bold";
+    t.textContent = m; document.body.appendChild(t);
+    setTimeout(() => t.remove(), 2500);
+}
+
+init();
+</script>
+</body>
+</html>
