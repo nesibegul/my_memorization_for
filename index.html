@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <meta name="theme-color" content="#091a10">
-<title>Hafızlık Pro AI | Besmele Düzeltilmiş</title>
+<title>Hafızlık Pro AI | v22</title>
 <link rel="manifest" href="manifest.json">
 <link href="https://fonts.googleapis.com/css2?family=Amiri+Quran&family=Amiri:wght@400;700&display=swap" rel="stylesheet">
 <style>
@@ -37,12 +37,12 @@
         font-family: 'Amiri Quran', serif;
         font-size: 32px;
         color: var(--green);
-        margin: 15px 0 25px 0;
+        margin: 10px 0 20px 0;
         text-align: center;
         display: block;
         width: 100%;
         border-bottom: 1px double var(--gold);
-        padding-bottom: 10px;
+        padding-bottom: 8px;
     }
 
     .quran-text { 
@@ -81,9 +81,9 @@
     .main-btn { width: 60px; height: 60px; background: var(--gold); border-radius: 50%; display: flex; justify-content: center; align-items: center; color: white; font-size: 28px; border:none; cursor: pointer; }
     .mic-btn { width: 50px; height: 50px; background: var(--red); border-radius: 50%; display: flex; justify-content: center; align-items: center; color: white; border: none; cursor: pointer; }
     .mic-btn.active { animation: pulse 1s infinite; background: #27ae60; }
-    @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.1); } 100% { transform: scale(1); } }
+    @keyframes pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.1); } }
 
-    /* Fihrist Modalı */
+    /* Modallar */
     .modal { position: fixed; inset: 0; background: rgba(0,0,0,0.85); display: none; z-index: 400; justify-content: center; align-items: center; }
     .modal-content { background: white; width: 95%; max-height: 85%; border-radius: 20px; overflow: hidden; display: flex; flex-direction: column; }
     .modal-tabs { display: flex; background: #d0d0d0; }
@@ -109,7 +109,7 @@
     <div id="status-bar">Okuma Devam Ediyor...</div>
 
     <div id="ai-panel">
-        <div style="display:flex; justify-content:space-between"><b>AI Analiz</b> <button onclick="closeAI()" style="background:none; border:none; font-size:20px">✕</button></div>
+        <div style="display:flex; justify-content:space-between"><b>AI Analiz</b> <button onclick="closeAI()">✕</button></div>
         <div id="ai-result" class="ai-res-text"></div>
     </div>
 
@@ -150,16 +150,15 @@
 <audio id="audio"></audio>
 
 <script>
+// --- PWA MANTIĞI ---
 if ('serviceWorker' in navigator) {
-    window.addEventListener('load', () => {
-        navigator.serviceWorker.register('sw.js');
-    });
+    window.addEventListener('load', () => { navigator.serviceWorker.register('sw.js'); });
 }
 
 const state = {
-    page: parseInt(localStorage.getItem('hafiz_v21_page')) || 1,
-    reciter: localStorage.getItem('hafiz_v21_reciter') || 'Alafasy_128kbps',
-    ezber: new Set(JSON.parse(localStorage.getItem('hafiz_v21_ezber') || '[]')),
+    page: parseInt(localStorage.getItem('hafiz_v22_page')) || 1,
+    reciter: localStorage.getItem('hafiz_v22_reciter') || 'Alafasy_128kbps',
+    ezber: new Set(JSON.parse(localStorage.getItem('hafiz_v22_ezber') || '[]')),
     playing: false,
     currentAyahIndex: 0,
     pageVerses: [],
@@ -172,10 +171,9 @@ const statusBar = document.getElementById('status-bar');
 async function init() {
     document.getElementById('reciter').value = state.reciter;
     try {
-        let cachedChapters = localStorage.getItem('hafiz_chapters_cache');
-        if (cachedChapters) {
-            state.surahs = JSON.parse(cachedChapters);
-        } else {
+        let cached = localStorage.getItem('hafiz_chapters_cache');
+        if (cached) { state.surahs = JSON.parse(cached); } 
+        else {
             const res = await fetch('https://api.quran.com/api/v4/chapters?language=tr');
             const data = await res.json();
             state.surahs = data.chapters;
@@ -188,12 +186,12 @@ async function init() {
 async function loadPage() {
     stopAudio();
     document.getElementById('page-content').innerHTML = "Yükleniyor...";
-    localStorage.setItem('hafiz_v21_page', state.page);
+    localStorage.setItem('hafiz_v22_page', state.page);
     document.getElementById('page-info').textContent = `SAYFA ${state.page}`;
     document.getElementById('cuz-info').textContent = `${Math.ceil(state.page/20)}. CÜZ`;
     document.getElementById('ezber-btn').textContent = state.ezber.has(state.page) ? '★' : '☆';
     
-    const cacheKey = `page_v21_${state.page}`;
+    const cacheKey = `page_v22_${state.page}`;
     let cachedData = localStorage.getItem(cacheKey);
 
     if (cachedData) {
@@ -206,21 +204,24 @@ async function loadPage() {
             state.pageVerses = data.verses;
             localStorage.setItem(cacheKey, JSON.stringify(data.verses));
             renderPage();
-        } catch (e) {
-            document.getElementById('page-content').innerHTML = "Hata: Sayfa yüklenemedi.";
-        }
+        } catch (e) { document.getElementById('page-content').innerHTML = "Bağlantı hatası."; }
     }
 }
 
-// --- BESMELE-İ ŞERİF EKLEME MANTIĞI ---
+// --- BESMELE DÜZELTİLMİŞ RENDER ---
 function renderPage() {
     let html = "";
     state.pageVerses.forEach((v, index) => {
-        // Eğer ayet 1. ayet ise (Sure başlangıcı) Besmele ekle
-        // İstisna 1: Fatiha Suresi (Zaten 1. ayet Besmeledir)
-        // İstisna 2: Tevbe Suresi (9. Sure - Başında Besmele yoktur)
-        if (v.verse_number === 1 && v.chapter_id !== 1 && v.chapter_id !== 9) {
-            html += `<div class="basmala">بِسْمِ ٱللَّهِ ٱلرَّحْمَٰنِ ٱلرَّحِيمِ</div>`;
+        // Sure ID'sini güvenli şekilde al
+        const surahId = parseInt(v.verse_key.split(':')[0]);
+        
+        // Eğer 1. ayet ise:
+        if (v.verse_number === 1) {
+            // Fatiha(1) zaten Besmele ile başlar. Tevbe(9) Besmelesizdir.
+            // Bu ikisi hariç tüm surelerin başına Besmele-i Şerif ekle.
+            if (surahId !== 1 && surahId !== 9) {
+                html += `<div class="basmala">بِسْمِ ٱللَّهِ ٱلرَّحْمَٰنِ ٱلرَّحِيمِ</div>`;
+            }
         }
         html += `<span id="v-${index}" class="ayah-text" onclick="state.currentAyahIndex=${index}; playAyah();">${v.text_uthmani} <span class="verse-num">${v.verse_number}</span> </span>`;
     });
@@ -233,10 +234,7 @@ function startAIAnalysis() {
     if (!SpeechAPI) { alert("Chrome kullanın."); return; }
     const recognition = new SpeechAPI();
     recognition.lang = 'ar-SA';
-    recognition.onstart = () => {
-        document.getElementById('mic-btn').classList.add('active');
-        showToast("Dinliyorum...");
-    };
+    recognition.onstart = () => { document.getElementById('mic-btn').classList.add('active'); showToast("Dinliyorum..."); };
     recognition.onresult = (event) => {
         const spoken = event.results[0][0].transcript;
         const original = state.pageVerses[state.currentAyahIndex].text_uthmani;
@@ -264,19 +262,17 @@ function closeAI() { document.getElementById('ai-panel').style.display = 'none';
 // --- SES VE OFFLINE ---
 async function downloadPageAudio() {
     showToast("Sayfa sesleri indiriliyor...");
-    const cache = await caches.open('hafiz-audio-v21');
+    const cache = await caches.open('hafiz-audio-v22');
     for (let v of state.pageVerses) {
         const sId = String(v.verse_key.split(':')[0]).padStart(3, '0');
         const aId = String(v.verse_key.split(':')[1]).padStart(3, '0');
         const url = `https://everyayah.com/data/${state.reciter}/${sId}${aId}.mp3`;
         await cache.add(url).catch(() => {});
     }
-    showToast("Sayfa hazır! Artık internetsiz dinleyebilirsiniz.");
+    showToast("Sayfa hazır!");
 }
 
-function togglePlay() {
-    state.playing ? (audio.pause(), state.playing = false, document.getElementById('play-btn').textContent = '▶', statusBar.style.display = 'none') : playAyah();
-}
+function togglePlay() { state.playing ? (audio.pause(), state.playing = false, document.getElementById('play-btn').textContent = '▶', statusBar.style.display = 'none') : playAyah(); }
 
 function playAyah() {
     if (state.currentAyahIndex >= state.pageVerses.length) { stopAudio(); return; }
@@ -303,16 +299,12 @@ function stopAudio() {
     document.querySelectorAll('.ayah-text').forEach(el => el.classList.remove('highlight'));
 }
 
-function changePage(n) {
-    state.page = Math.max(1, Math.min(604, state.page + n));
-    loadPage();
-}
-
-function saveSettings() { localStorage.setItem('hafiz_v21_reciter', state.reciter); }
+function changePage(n) { state.page = Math.max(1, Math.min(604, state.page + n)); loadPage(); }
+function saveSettings() { localStorage.setItem('hafiz_v22_reciter', state.reciter); }
 
 function toggleEzber() {
     state.ezber.has(state.page) ? state.ezber.delete(state.page) : state.ezber.add(state.page);
-    localStorage.setItem('hafiz_v21_ezber', JSON.stringify([...state.ezber]));
+    localStorage.setItem('hafiz_v22_ezber', JSON.stringify([...state.ezber]));
     document.getElementById('ezber-btn').textContent = state.ezber.has(state.page) ? '★' : '☆';
 }
 
@@ -357,7 +349,7 @@ function switchTab(btn, type) {
 
 function showToast(m) {
     const t = document.createElement('div');
-    t.style = "position:fixed; bottom:100px; left:50%; transform:translateX(-50%); background:rgba(0,0,0,0.85); color:white; padding:12px 24px; border-radius:30px; font-size:12px; z-index:3000; font-weight:bold; white-space:nowrap";
+    t.style = "position:fixed; bottom:100px; left:50%; transform:translateX(-50%); background:rgba(0,0,0,0.85); color:white; padding:12px 24px; border-radius:30px; font-size:14px; z-index:3000; font-weight:bold; white-space:nowrap";
     t.textContent = m; document.body.appendChild(t);
     setTimeout(() => t.remove(), 2500);
 }
